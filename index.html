@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wishlist</title>
+<meta name="color-scheme" content="light">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎁</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bitcount+Ink:wght@400..800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: { extend: {
+      fontFamily: { display: ['"Bitcount Ink"', 'ui-monospace', 'monospace'], sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'] },
+      colors: { ink: '#17173A', paper: '#F5F6FA', iris: '#5B4BFF', mint: '#0E9F77', rose: '#FF5C8A' }
+    } }
+  };
+</script>
+
+
+<!-- Firebase (compat build, works as plain <script> tags). If it fails to load, the app falls back to Demo mode. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+<style>
+  html { -webkit-text-size-adjust: 100%; }
+  .font-display { letter-spacing: 0 !important; line-height: 1.15 !important; }
+  body { background: #F5F6FA; color: #17173A; font-family: 'IBM Plex Sans', system-ui, sans-serif; min-height: 100vh; }
+  :focus-visible { outline: 3px solid #5B4BFF; outline-offset: 2px; border-radius: 10px; }
+
+  /* Gift-tag card: a punched hole in the corner */
+  .tag { position: relative; background: #fff; border: 1.5px solid #E3E5F0; border-radius: 22px; transition: border-color .25s, background .25s, transform .25s; }
+  .tag::before { content: ""; position: absolute; top: 14px; left: 14px; width: 11px; height: 11px; border-radius: 50%; background: #F5F6FA; border: 1.5px solid #D5D8E8; }
+  .tag.claimed { background: #F1FAF6; border-color: #BFE8D8; }
+  .title-text { background-image: linear-gradient(currentColor, currentColor); background-repeat: no-repeat; background-position: 0 55%; background-size: 0% 2px; transition: background-size .5s ease, color .3s; }
+  .claimed .title-text { background-size: 100% 2px; color: #6B7090; }
+
+  @keyframes pop { 0% { transform: scale(1); } 35% { transform: scale(1.035) rotate(-.6deg); box-shadow: 0 0 0 8px rgba(14,159,119,.18); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(14,159,119,0); } }
+  .pop { animation: pop .7s cubic-bezier(.2,.9,.3,1.3); }
+  @keyframes badgeIn { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .badge-in { animation: badgeIn .45s cubic-bezier(.2,.9,.3,1.5) both; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes sheetIn { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .fade-in { animation: fadeIn .2s ease both; }
+  .sheet-in { animation: sheetIn .28s cubic-bezier(.2,.8,.3,1) both; }
+  @keyframes toastIn { from { transform: translate(-50%, 16px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+  .toast { animation: toastIn .25s ease both; }
+  @keyframes pulseDot { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  .live-dot { animation: pulseDot 2s infinite; }
+
+  .field { width: 100%; background: #F5F6FA; border: 1.5px solid transparent; border-radius: 14px; padding: .75rem .9rem; font-size: 16px; transition: border-color .15s, background .15s; }
+  .field:focus { outline: none; border-color: #5B4BFF; background: #fff; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; border-radius: 14px; padding: .7rem 1.1rem; font-weight: 600; font-size: 15px; transition: transform .12s, background .15s, opacity .15s; min-height: 44px; }
+  .btn:active:not(:disabled) { transform: scale(.97); }
+  .btn:disabled { cursor: not-allowed; }
+  .btn-primary { background: #17173A; color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: #2a2a5c; }
+  .btn-iris { background: #5B4BFF; color: #fff; }
+  .btn-iris:hover:not(:disabled) { background: #4a3bea; }
+  .btn-ghost { background: #EEF0F8; color: #17173A; }
+  .btn-ghost:hover:not(:disabled) { background: #E2E5F2; }
+  .btn-danger { background: #E5484D; color: #fff; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+</style>
+</head>
+<body>
+<div id="app" class="mx-auto max-w-5xl px-4 pb-24" style="padding-top: max(1.25rem, env(safe-area-inset-top));"></div>
+<div id="modal-root"></div>
+<div id="toast-root" aria-live="polite"></div>
+
+<script>
+/* =====================================================================
+   SETUP (≈ 3 minutes) — Firebase Realtime Database
+   ---------------------------------------------------------------------
+   1. Go to https://console.firebase.google.com → Add project (Analytics not needed).
+   2. Build → Realtime Database → Create database (any region, start in locked mode).
+   3. Project settings (⚙) → General → "Your apps" → Web (</>) → register app.
+      Copy the firebaseConfig values into FIREBASE_CONFIG below.
+   4. Realtime Database → Rules → paste the following and Publish:
+
+      {
+        "rules": {
+          "lists": {
+            "$listId": {
+              ".read": true,
+              ".write": "!data.exists()",            // a list can be created once, never overwritten/deleted
+              "items": { "$itemId": { ".write": true } }  // guests can claim; see note below
+            }
+          }
+        }
+      }
+
+      NOTE: with no sign-in (100% anonymous), the owner passcode is enforced by the
+      app UI, not by the database. That's fine for a family/friends list. For hard
+      security you would add Firebase Auth or a Cloud Function — which costs anonymity.
+      The passcode is stored only as a salted SHA-256 hash.
+
+   5. Host this single file anywhere (GitHub Pages, Netlify Drop, Firebase Hosting,
+      or just open it). Share the list link with guests.
+
+   Until FIREBASE_CONFIG is filled in, the app runs in DEMO MODE: data lives in this
+   browser only (and syncs between tabs), so you can try every feature immediately.
+
+   Alternative: JSONBin works too — implement the same 6 methods as `firebaseBackend`
+   (create, subscribe, saveItem, deleteItem, claim, release) using fetch + polling.
+   ===================================================================== */
+const FIREBASE_CONFIG = {
+  apiKey:      "YOUR_API_KEY",
+  authDomain:  "YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId:   "YOUR_PROJECT",
+  appId:       "YOUR_APP_ID"
+};
+
+/* ---------- Helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const shortId = () => Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 5);
+const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const ssGet = k => { try { return sessionStorage.getItem(k); } catch { return null; } };
+const ssSet = (k, v) => { try { sessionStorage.setItem(k, v); } catch {} };
+const ssDel = k => { try { sessionStorage.removeItem(k); } catch {} };
+
+async function hashPass(listId, pass) {
+  const input = listId + ':' + pass;
+  if (window.crypto && crypto.subtle) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  let h = 5381; for (const ch of input) h = ((h << 5) + h + ch.charCodeAt(0)) >>> 0; // weak fallback for non-secure contexts
+  return 'x' + h.toString(16);
+}
+
+const CATEGORIES = { Tech: '🎧', Home: '🛋️', Fashion: '👟', Books: '📚', Experiences: '🎟️', Other: '✨' };
+
+/* ---------- Backends (same interface) ---------- */
+function firebaseBackend() {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  const db = firebase.database();
+  const ref = id => db.ref('lists/' + id);
+  return {
+    mode: 'firebase',
+    create: (id, data) => ref(id).set(data),
+    subscribe(id, cb) {
+      const r = ref(id);
+      const h = r.on('value', s => cb(s.val()), err => cb(null, err));
+      return () => r.off('value', h);
+    },
+    saveItem: (id, item) => ref(id).child('items/' + item.id).update(item),
+    deleteItem: (id, itemId) => ref(id).child('items/' + itemId).remove(),
+    async claim(id, itemId, token) {
+      const res = await ref(id).child('items/' + itemId + '/claim').transaction(cur => cur ? undefined : { token, at: Date.now() });
+      return res.committed;
+    },
+    async release(id, itemId, token, force) {
+      const res = await ref(id).child('items/' + itemId + '/claim').transaction(cur => (cur && (force || cur.token === token)) ? null : undefined);
+      return res.committed;
+    }
+  };
+}
+
+function localBackend() {
+  const KEY = 'wishlist-demo-db-v1';
+  let mem = {}, useMem = false;
+  const read = () => { if (useMem) return mem; try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { useMem = true; return mem; } };
+  const listeners = new Set();
+  const write = d => { if (useMem) mem = d; else { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch { useMem = true; mem = d; } } listeners.forEach(f => f()); };
+  window.addEventListener('storage', e => { if (e.key === KEY) listeners.forEach(f => f()); });
+  return {
+    mode: 'local',
+    async create(id, data) { const d = read(); d[id] = data; write(d); },
+    subscribe(id, cb) { const f = () => cb(read()[id] || null); listeners.add(f); f(); return () => listeners.delete(f); },
+    async saveItem(id, item) { const d = read(); const l = d[id]; if (!l) return; l.items = l.items || {}; l.items[item.id] = { ...(l.items[item.id] || {}), ...item }; write(d); },
+    async deleteItem(id, itemId) { const d = read(); if (d[id]?.items) delete d[id].items[itemId]; write(d); },
+    async claim(id, itemId, token) { const d = read(); const it = d[id]?.items?.[itemId]; if (!it || it.claim) return false; it.claim = { token, at: Date.now() }; write(d); return true; },
+    async release(id, itemId, token, force) { const d = read(); const it = d[id]?.items?.[itemId]; if (!it?.claim || !(force || it.claim.token === token)) return false; delete it.claim; write(d); return true; }
+  };
+}
+
+const firebaseReady = typeof firebase !== 'undefined' && !FIREBASE_CONFIG.apiKey.startsWith('YOUR_');
+let Backend;
+try { Backend = firebaseReady ? firebaseBackend() : localBackend(); } catch (e) { console.error(e); Backend = localBackend(); }
+
+/* ---------- State ---------- */
+const S = { listId: null, list: null, status: 'loading', err: '', unsub: null, owner: false, hideClaims: true, filter: 'All', prevClaims: null, pop: new Set() };
+const myClaims = () => lsGet('wl-claims:' + S.listId, {});
+const setMyClaim = (itemId, token) => { const m = myClaims(); if (token) m[itemId] = token; else delete m[itemId]; lsSet('wl-claims:' + S.listId, m); };
+const itemsOf = list => Object.entries(list?.items || {}).map(([id, v]) => ({ ...v, id })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+
+/* ---------- Router ---------- */
+function route() {
+  if (S.unsub) { S.unsub(); S.unsub = null; }
+  closeModal();
+  const m = location.hash.match(/^#\/l\/([\w-]+)/);
+  if (!m) { S.listId = null; renderHome(); return; }
+  Object.assign(S, { listId: m[1], list: null, status: 'loading', prevClaims: null, filter: 'All', hideClaims: true });
+  S.owner = ssGet('wl-owner:' + S.listId) === '1';
+  renderList();
+  S.unsub = Backend.subscribe(S.listId, onData);
+}
+window.addEventListener('hashchange', route);
+
+function onData(data, err) {
+  if (err) { S.status = 'error'; S.err = err.message || 'Could not reach the database.'; }
+  else if (!data) { S.status = 'missing'; }
+  else {
+    S.status = 'ready';
+    const claims = new Set(itemsOf(data).filter(i => i.claim).map(i => i.id));
+    if (S.prevClaims) {
+      const mine = myClaims();
+      for (const id of claims) if (!S.prevClaims.has(id)) {
+        S.pop.add(id);
+        const it = data.items[id];
+        if (!(S.owner && S.hideClaims) && mine[id] !== it.claim?.token) toast(`🎁 “${it.name}” was just claimed`);
+      }
+    }
+    S.prevClaims = claims;
+    S.list = data;
+  }
+  renderList();
+}
+
+/* ---------- Home ---------- */
+function statusPill() {
+  return Backend.mode === 'firebase'
+    ? `<span class="inline-flex items-center gap-1.5 text-xs font-semibold text-mint bg-[#E3F6EF] rounded-full px-2.5 py-1"><span class="live-dot w-1.5 h-1.5 rounded-full bg-mint"></span>Live</span>`
+    : `<span class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#8A5A00] bg-[#FFF1D6] rounded-full px-2.5 py-1">Demo · this browser only</span>`;
+}
+function demoBanner() {
+  if (Backend.mode === 'firebase') return '';
+  return `<div class="mt-4 rounded-2xl bg-[#FFF8E8] border border-[#F3DFAE] text-[#6B4A00] text-sm p-4 leading-relaxed">
+    <b>Demo mode.</b> Add your Firebase keys in the <code class="bg-white/70 px-1 rounded">FIREBASE_CONFIG</code> block at the top of the script to share lists live with other people. Until then, lists stay in this browser (open two tabs to see sync).
+  </div>`;
+}
+
+function renderHome() {
+  const mine = lsGet('wl-mylists', []);
+  $('#app').innerHTML = `
+  <header class="flex items-center justify-between pt-2">
+    <div class="font-display font-extrabold text-xl tracking-tight">wishlist</div>${statusPill()}
+  </header>
+  <section class="mt-10 sm:mt-16 max-w-xl">
+    <h1 class="font-display font-extrabold text-4xl sm:text-6xl leading-[1.02] tracking-tight">Let people pick a gift you’ll actually love.</h1>
+    <p class="mt-4 text-lg text-[#4B4F73] max-w-md">Make a list, share the link. Guests claim items anonymously, and nobody buys the same thing twice.</p>
+  </section>
+  ${demoBanner()}
+  <form id="create-form" class="mt-8 bg-white rounded-3xl border border-[#E3E5F0] p-5 sm:p-6 max-w-xl space-y-4">
+    <div>
+      <label class="block text-sm font-semibold mb-1.5" for="c-title">List name</label>
+      <input id="c-title" class="field" maxlength="60" required placeholder="Maya’s 30th birthday">
+    </div>
+    <div>
+      <label class="block text-sm font-semibold mb-1.5" for="c-pass">Owner passcode</label>
+      <input id="c-pass" class="field" type="password" minlength="4" required placeholder="At least 4 characters" autocomplete="new-password">
+      <p class="text-xs text-[#6B7090] mt-1.5">You’ll need this to add, edit, or delete items. Guests never see it. It can’t be recovered.</p>
+    </div>
+    <button class="btn btn-iris w-full" type="submit">Create wishlist</button>
+  </form>
+  ${mine.length ? `<section class="mt-8 max-w-xl"><h2 class="font-display font-bold text-lg mb-2">Your lists on this device</h2>
+    <div class="space-y-2">${mine.map(l => `<a href="#/l/${esc(l.id)}" class="flex items-center justify-between bg-white border border-[#E3E5F0] rounded-2xl px-4 py-3 hover:border-iris transition-colors"><span class="font-medium">${esc(l.title)}</span><span class="text-iris text-sm font-semibold">Open</span></a>`).join('')}</div></section>` : ''}`;
+
+  $('#create-form').onsubmit = async e => {
+    e.preventDefault();
+    const title = $('#c-title').value.trim(), pass = $('#c-pass').value;
+    if (!title || pass.length < 4) return;
+    const btn = e.submitter; btn.disabled = true; btn.textContent = 'Creating…';
+    const id = shortId();
+    try {
+      await Backend.create(id, { title, owner: await hashPass(id, pass), createdAt: Date.now() });
+      lsSet('wl-mylists', [{ id, title }, ...mine]);
+      ssSet('wl-owner:' + id, '1');
+      location.hash = '#/l/' + id;
+    } catch (err) {
+      btn.disabled = false; btn.textContent = 'Create wishlist';
+      toast('Couldn’t create the list. Check your Firebase config and rules.');
+      console.error(err);
+    }
+  };
+}
+
+/* ---------- List view ---------- */
+function renderList() {
+  const root = $('#app');
+  const head = `<header class="flex items-center justify-between pt-2">
+      <a href="#/" class="font-display font-extrabold text-xl tracking-tight">wishlist</a>${statusPill()}</header>`;
+
+  if (S.status === 'loading') { root.innerHTML = head + `<p class="mt-16 text-[#6B7090]">Loading list…</p>`; return; }
+  if (S.status === 'missing') {
+    root.innerHTML = head + `<div class="mt-16 max-w-md"><h1 class="font-display font-extrabold text-3xl">We couldn’t find that list.</h1><p class="mt-2 text-[#4B4F73]">Check the link, or ask the owner to share it again.</p><a href="#/" class="btn btn-primary mt-5">Create a new list</a></div>`; return;
+  }
+  if (S.status === 'error') {
+    root.innerHTML = head + `<div class="mt-16 max-w-md"><h1 class="font-display font-extrabold text-3xl">Can’t reach the list.</h1><p class="mt-2 text-[#4B4F73]">${esc(S.err)} If you own this list, check your Firebase rules allow reads on <code>lists</code>.</p></div>`; return;
+  }
+
+  const items = itemsOf(S.list);
+  const cats = ['All', ...Object.keys(CATEGORIES).filter(c => items.some(i => i.category === c))];
+  if (!cats.includes(S.filter)) S.filter = 'All';
+  const shown = items.filter(i => S.filter === 'All' || i.category === S.filter);
+  const showClaims = !(S.owner && S.hideClaims);
+  const claimedCount = items.filter(i => i.claim).length;
+
+  root.innerHTML = head + `
+  <section class="mt-8 sm:mt-12">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+      <div class="min-w-0">
+        <h1 class="font-display font-extrabold text-3xl sm:text-5xl tracking-tight leading-[1.05] break-words">${esc(S.list.title)}</h1>
+        <p class="mt-2 text-[#4B4F73]">${items.length} ${items.length === 1 ? 'item' : 'items'}${showClaims && items.length ? `, ${claimedCount} claimed` : ''}</p>
+      </div>
+      <div class="flex gap-2 flex-wrap">
+        <button class="btn btn-ghost" data-action="share">Copy share link</button>
+        <button class="btn ${S.owner ? 'btn-primary' : 'btn-ghost'}" data-action="owner" aria-pressed="${S.owner}">${S.owner ? 'Owner mode on' : 'Owner login'}</button>
+      </div>
+    </div>
+    ${demoBanner()}
+    ${S.owner ? `
+    <div class="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white border border-[#E3E5F0] p-3 sm:p-4">
+      <button class="btn btn-iris" data-action="add">+ Add item</button>
+      <label class="flex items-center gap-2.5 text-sm cursor-pointer select-none">
+        <input type="checkbox" class="w-5 h-5 accent-[#5B4BFF]" data-action="surprise" ${S.hideClaims ? 'checked' : ''}>
+        <span><b>Keep it a surprise</b><span class="text-[#6B7090]"> — hide who’s buying what from me</span></span>
+      </label>
+    </div>` : ''}
+    ${cats.length > 2 ? `<div class="mt-6 flex gap-2 overflow-x-auto pb-1 -mx-4 px-4" role="tablist" aria-label="Filter by category">
+      ${cats.map(c => `<button role="tab" aria-selected="${c === S.filter}" data-action="filter" data-id="${esc(c)}" class="shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${c === S.filter ? 'bg-ink text-white' : 'bg-white border border-[#E3E5F0] hover:border-ink'}">${c === 'All' ? 'All' : CATEGORIES[c] + ' ' + c}</button>`).join('')}</div>` : ''}
+  </section>
+
+  <section class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    ${shown.map(i => card(i, showClaims)).join('')}
+  </section>
+  ${!shown.length ? `<div class="mt-10 text-center max-w-sm mx-auto py-10">
+      <div class="text-5xl mb-3">🎁</div>
+      <h2 class="font-display font-bold text-xl">${S.owner ? 'Your list is empty' : 'Nothing here yet'}</h2>
+      <p class="text-[#4B4F73] mt-1">${S.owner ? 'Add your first item to start sharing.' : 'The owner hasn’t added anything. Check back soon.'}</p></div>` : ''}`;
+
+  S.pop.forEach(id => { const el = root.querySelector(`[data-card="${CSS.escape(id)}"]`); if (el) el.classList.add('pop'); });
+  S.pop.clear();
+}
+
+function linkify(text) {
+  return esc(text).replace(/(https?:\/\/[^\s<]+)/g, u => `<a class="text-iris font-semibold underline underline-offset-2 break-all" href="${u}" target="_blank" rel="noopener noreferrer nofollow">${u.length > 38 ? u.slice(0, 36) + '…' : u}</a>`);
+}
+
+function card(i, showClaims) {
+  const claimed = !!i.claim && showClaims;
+  const mine = claimed && myClaims()[i.id] === i.claim.token;
+  let action = '';
+  if (S.owner) {
+    action = `<div class="flex gap-2">
+      <button class="btn btn-ghost flex-1" data-action="edit" data-id="${esc(i.id)}">Edit</button>
+      <button class="btn btn-ghost text-[#C2343A]" data-action="delete" data-id="${esc(i.id)}" aria-label="Delete ${esc(i.name)}">Delete</button>
+      ${claimed ? `<button class="btn btn-ghost" data-action="force-release" data-id="${esc(i.id)}" title="Release this claim">Reset claim</button>` : ''}</div>`;
+  } else if (!claimed) {
+    action = `<button class="btn btn-iris w-full" data-action="claim" data-id="${esc(i.id)}">I’ll buy this</button>`;
+  } else {
+    action = `<div class="flex gap-2">
+      <button class="btn flex-1 bg-[#DDEFE8] text-[#3D6B5A]" disabled>Claimed</button>
+      ${mine ? `<button class="btn btn-ghost" data-action="undo" data-id="${esc(i.id)}">Undo</button>` : ''}</div>`;
+  }
+  return `<article class="tag p-5 pt-9 flex flex-col ${claimed ? 'claimed' : ''}" data-card="${esc(i.id)}">
+    <div class="flex items-start justify-between gap-3">
+      <span class="text-xs font-semibold text-[#4B4F73] bg-paper rounded-full px-2.5 py-1">${CATEGORIES[i.category] || '✨'} ${esc(i.category || 'Other')}</span>
+      ${i.price ? `<span class="font-sans font-bold text-lg whitespace-nowrap">${esc(i.price)}</span>` : ''}
+    </div>
+    <h3 class="mt-3 font-display font-bold text-xl leading-snug"><span class="title-text">${esc(i.name)}</span></h3>
+    ${claimed ? `<span class="badge-in self-start mt-2 inline-flex items-center gap-1 text-xs font-semibold text-mint bg-[#DDF3EA] rounded-full px-2.5 py-1">✓ Claimed${mine ? ' by you' : ''}</span>` : ''}
+    ${i.link ? `<p class="mt-2 text-sm text-[#4B4F73] leading-relaxed whitespace-pre-line break-words">${linkify(i.link)}</p>` : ''}
+    <div class="mt-auto pt-5">${action}</div>
+  </article>`;
+}
+
+/* ---------- Actions ---------- */
+document.addEventListener('click', async e => {
+  const el = e.target.closest('[data-action]'); if (!el || el.tagName === 'INPUT') return;
+  const a = el.dataset.action, id = el.dataset.id;
+  if (a === 'share') return share();
+  if (a === 'owner') return S.owner ? (S.owner = false, ssDel('wl-owner:' + S.listId), renderList(), toast('Owner mode off')) : passcodeModal();
+  if (a === 'add') return itemModal();
+  if (a === 'edit') return itemModal(S.list.items[id] && { ...S.list.items[id], id });
+  if (a === 'delete') return deleteModal(id);
+  if (a === 'filter') { S.filter = id; return renderList(); }
+  if (a === 'undo') return undoModal(id);
+  if (a === 'force-release') return undoModal(id, true);
+  if (a === 'claim') return claim(id, el);
+});
+document.addEventListener('change', e => {
+  if (e.target.dataset.action === 'surprise') { S.hideClaims = e.target.checked; renderList(); }
+});
+
+async function share() {
+  const url = location.href.split('#')[0] + '#/l/' + S.listId;
+  try { await navigator.clipboard.writeText(url); toast('Link copied. Anyone with it can view and claim items.'); }
+  catch { window.prompt('Copy this link:', url); }
+}
+
+async function claim(itemId, btn) {
+  btn.disabled = true;
+  const token = uid() + uid();
+  const rect = btn.getBoundingClientRect();
+  try {
+    const ok = await Backend.claim(S.listId, itemId, token);
+    if (ok) {
+      setMyClaim(itemId, token); S.pop.add(itemId);
+      confetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      toast('🎉 It’s yours. Everyone else can see it’s taken.');
+      if (Backend.mode === 'local') renderList(); // local backend is synchronous-ish; subscribe handles Firebase
+    } else { toast('Someone just claimed that one.'); }
+  } catch (err) { console.error(err); toast('Couldn’t claim. Please try again.'); btn.disabled = false; }
+}
+
+/* ---------- Modals ---------- */
+function openModal(html, onMount) {
+  const root = $('#modal-root');
+  root.innerHTML = `<div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+    <div data-close class="absolute inset-0 bg-ink/50 backdrop-blur-sm fade-in"></div>
+    <div role="dialog" aria-modal="true" class="sheet-in relative w-full sm:max-w-md bg-white rounded-t-[28px] sm:rounded-[28px] shadow-2xl p-6 max-h-[92vh] overflow-auto" style="padding-bottom: max(1.5rem, env(safe-area-inset-bottom));">${html}</div></div>`;
+  root.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeModal));
+  if (onMount) onMount(root);
+  const f = root.querySelector('input:not([type=hidden]),textarea'); if (f) setTimeout(() => f.focus(), 60);
+}
+function closeModal() { $('#modal-root').innerHTML = ''; }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+function undoModal(itemId, force = false) {
+  const it = S.list?.items?.[itemId]; if (!it) return;
+  openModal(`<h2 class="font-display font-extrabold text-2xl">${force ? 'Reset this claim?' : 'Release this item?'}</h2>
+    <p class="mt-2 text-[#4B4F73]">“${esc(it.name)}” will become available to everyone again. ${force ? 'The person who claimed it won’t be notified.' : 'Only do this if you clicked by accident or can’t buy it anymore.'}</p>
+    <div class="mt-6 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+      <button class="btn btn-ghost" data-close>Keep my claim</button>
+      <button class="btn btn-danger" id="confirm-undo">${force ? 'Reset claim' : 'Yes, release it'}</button></div>`,
+    root => {
+      if (force) root.querySelector('[data-close].btn').textContent = 'Cancel';
+      $('#confirm-undo').onclick = async () => {
+        try {
+          const ok = await Backend.release(S.listId, itemId, myClaims()[itemId], force);
+          if (ok) { setMyClaim(itemId, null); toast('Released. It’s available again.'); } else toast('That claim has already changed.');
+        } catch { toast('Couldn’t release. Please try again.'); }
+        closeModal();
+      };
+    });
+}
+
+function passcodeModal() {
+  openModal(`<h2 class="font-display font-extrabold text-2xl">Owner login</h2>
+    <p class="mt-1 text-[#4B4F73] text-sm">Enter the passcode you chose when you created this list.</p>
+    <form id="pass-form" class="mt-4 space-y-3">
+      <input class="field" type="password" id="pass-in" placeholder="Passcode" autocomplete="current-password" required>
+      <p id="pass-err" class="text-sm text-[#C2343A] hidden">That passcode doesn’t match. Try again.</p>
+      <div class="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+        <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+        <button class="btn btn-primary" type="submit">Unlock</button></div></form>`,
+    () => {
+      $('#pass-form').onsubmit = async e => {
+        e.preventDefault();
+        const h = await hashPass(S.listId, $('#pass-in').value);
+        if (h === S.list?.owner) { S.owner = true; ssSet('wl-owner:' + S.listId, '1'); closeModal(); renderList(); toast('Owner mode on'); }
+        else { $('#pass-err').classList.remove('hidden'); $('#pass-in').select(); }
+      };
+    });
+}
+
+function itemModal(item) {
+  const editing = !!item;
+  openModal(`<h2 class="font-display font-extrabold text-2xl">${editing ? 'Edit item' : 'Add an item'}</h2>
+    <form id="item-form" class="mt-4 space-y-3">
+      <div><label class="block text-sm font-semibold mb-1" for="i-name">Item name</label>
+        <input id="i-name" class="field" required maxlength="80" placeholder="Noise-cancelling headphones" value="${esc(item?.name)}"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-sm font-semibold mb-1" for="i-price">Price or estimate</label>
+          <input id="i-price" class="field" maxlength="20" placeholder="$120" value="${esc(item?.price)}"></div>
+        <div><label class="block text-sm font-semibold mb-1" for="i-cat">Category</label>
+          <select id="i-cat" class="field">${Object.keys(CATEGORIES).map(c => `<option ${((item?.category || 'Other') === c) ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+      </div>
+      <div><label class="block text-sm font-semibold mb-1" for="i-link">Link or notes</label>
+        <textarea id="i-link" class="field" rows="3" maxlength="500" placeholder="https://… or “size M, black”">${esc(item?.link)}</textarea></div>
+      <div class="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-2">
+        <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+        <button class="btn btn-iris" type="submit">${editing ? 'Save changes' : 'Add to list'}</button></div></form>`,
+    () => {
+      $('#item-form').onsubmit = async e => {
+        e.preventDefault();
+        const data = { id: item?.id || uid(), name: $('#i-name').value.trim(), price: $('#i-price').value.trim(), link: $('#i-link').value.trim(), category: $('#i-cat').value };
+        if (!data.name) return;
+        if (!editing) data.createdAt = Date.now();
+        e.submitter.disabled = true;
+        try { await Backend.saveItem(S.listId, data); closeModal(); toast(editing ? 'Saved' : 'Added to your list'); }
+        catch (err) { console.error(err); e.submitter.disabled = false; toast('Couldn’t save. Please try again.'); }
+      };
+    });
+}
+
+function deleteModal(itemId) {
+  const it = S.list?.items?.[itemId]; if (!it) return;
+  openModal(`<h2 class="font-display font-extrabold text-2xl">Delete this item?</h2>
+    <p class="mt-2 text-[#4B4F73]">“${esc(it.name)}” will be removed for everyone${it.claim ? ', including the person who claimed it' : ''}.</p>
+    <div class="mt-6 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+      <button class="btn btn-ghost" data-close>Cancel</button>
+      <button class="btn btn-danger" id="confirm-del">Delete item</button></div>`,
+    () => { $('#confirm-del').onclick = async () => { try { await Backend.deleteItem(S.listId, itemId); toast('Deleted'); } catch { toast('Couldn’t delete. Please try again.'); } closeModal(); }; });
+}
+
+/* ---------- Toasts & confetti ---------- */
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast fixed left-1/2 z-[60] max-w-[92vw] bg-ink text-white text-sm font-medium rounded-2xl px-4 py-3 shadow-xl';
+  t.style.bottom = 'max(1.25rem, env(safe-area-inset-bottom))';
+  t.textContent = msg;
+  $('#toast-root').replaceChildren(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+function confetti(x, y) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const colors = ['#5B4BFF', '#FF5C8A', '#0E9F77', '#FFB400', '#17173A'];
+  for (let n = 0; n < 34; n++) {
+    const p = document.createElement('i');
+    const size = 6 + Math.random() * 7;
+    Object.assign(p.style, { position: 'fixed', left: x + 'px', top: y + 'px', width: size + 'px', height: size * (Math.random() > .5 ? 1 : .45) + 'px', background: colors[n % colors.length], borderRadius: Math.random() > .6 ? '50%' : '2px', zIndex: 70, pointerEvents: 'none' });
+    document.body.appendChild(p);
+    const ang = Math.random() * Math.PI * 2, dist = 70 + Math.random() * 130;
+    const dx = Math.cos(ang) * dist, dy = Math.sin(ang) * dist - 60;
+    p.animate([
+      { transform: 'translate(-50%,-50%) rotate(0)', opacity: 1 },
+      { transform: `translate(${dx}px, ${dy}px) rotate(${Math.random() * 540}deg)`, opacity: 1, offset: .55 },
+      { transform: `translate(${dx * 1.1}px, ${dy + 140}px) rotate(${Math.random() * 720}deg)`, opacity: 0 }
+    ], { duration: 1100 + Math.random() * 500, easing: 'cubic-bezier(.2,.7,.3,1)' }).onfinish = () => p.remove();
+  }
+}
+
+route();
+</script>
+</body>
+</html>
