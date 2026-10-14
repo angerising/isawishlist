@@ -1,19 +1,19 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Isa’s Wishlist</title>
+<title>isa’s wishlist</title>
 <meta name="color-scheme" content="light">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎁</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⭐</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bitcount+Ink:wght@400..800&family=IBM+Plex+Sans:wght@400;500;600;700&family=Petit+Formal+Script&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Petit+Formal+Script&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = {
     theme: { extend: {
-      fontFamily: { display: ['"Bitcount Ink"', 'ui-monospace', 'monospace'], sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'], script: ['"Petit Formal Script"', 'cursive'] },
+      fontFamily: { sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'], script: ['"Petit Formal Script"', 'cursive'] },
       colors: { ink: '#17173A', paper: '#F5F6FA', iris: '#5B4BFF', mint: '#0E9F77', rose: '#FF5C8A' }
     } }
   };
@@ -26,7 +26,6 @@
 
 <style>
   html { -webkit-text-size-adjust: 100%; }
-  .font-display { letter-spacing: 0 !important; line-height: 1.15 !important; }
   body { background: #F5F6FA; color: #17173A; font-family: 'IBM Plex Sans', system-ui, sans-serif; min-height: 100vh; }
   :focus-visible { outline: 3px solid #5B4BFF; outline-offset: 2px; border-radius: 10px; }
 
@@ -139,6 +138,8 @@ async function hashPass(listId, pass) {
 }
 
 const CATEGORIES = { Tech: '🎧', Home: '🛋️', Fashion: '👟', Books: '📚', Experiences: '🎟️', Other: '✨' };
+/* Keys above are what's stored in the database; these are just the Spanish labels shown on screen. */
+const CAT_LABELS = { Tech: 'Tecnología', Home: 'Hogar', Fashion: 'Moda', Books: 'Libros', Experiences: 'Experiencias', Other: 'Otros' };
 
 /* ---------- Backends (same interface) ---------- */
 function firebaseBackend() {
@@ -218,7 +219,7 @@ function onData(data, err) {
       for (const id of claims) if (!S.prevClaims.has(id)) {
         S.pop.add(id);
         const it = data.items[id];
-        if (!(S.owner && S.hideClaims) && mine[id] !== it.claim?.token) toast(`🦂 “${it.name}” was just claimed`);
+        if (!(S.owner && S.hideClaims) && mine[id] !== it.claim?.token) toast(`🎁 “${it.name}” acaba de ser reservado`);
       }
     }
     S.prevClaims = claims;
@@ -230,43 +231,43 @@ function onData(data, err) {
 /* ---------- Home ---------- */
 function statusPill() {
   return Backend.mode === 'firebase'
-    ? `<span class="inline-flex items-center gap-1.5 text-xs font-semibold text-mint bg-[#E3F6EF] rounded-full px-2.5 py-1"><span class="live-dot w-1.5 h-1.5 rounded-full bg-mint"></span>Live</span>`
-    : `<span class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#8A5A00] bg-[#FFF1D6] rounded-full px-2.5 py-1">Demo · this browser only</span>`;
+    ? `<span class="inline-flex items-center gap-1.5 text-xs font-semibold text-mint bg-[#E3F6EF] rounded-full px-2.5 py-1"><span class="live-dot w-1.5 h-1.5 rounded-full bg-mint"></span>En vivo</span>`
+    : `<span class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#8A5A00] bg-[#FFF1D6] rounded-full px-2.5 py-1">Demo · solo este navegador</span>`;
 }
 function demoBanner() {
   if (Backend.mode === 'firebase') return '';
   return `<div class="mt-4 rounded-lg bg-[#FFF8E8] border border-[#F3DFAE] text-[#6B4A00] text-sm p-4 leading-relaxed">
-    <b>Demo mode.</b> Add your Firebase keys in the <code class="bg-white/70 px-1 rounded">FIREBASE_CONFIG</code> block at the top of the script to share lists live with other people. Until then, lists stay in this browser (open two tabs to see sync).
+    <b>Modo demo.</b> Agrega tus claves de Firebase en el bloque <code class="bg-white/70 px-1 rounded">FIREBASE_CONFIG</code> al inicio del script para compartir listas en vivo con otras personas. Mientras tanto, las listas quedan solo en este navegador (abre dos pestañas para ver la sincronización).
   </div>`;
 }
 
 function renderHome() {
   const mine = lsGet('wl-mylists', []);
   $('#app').innerHTML = `
-  <header class="flex items-center justify-between pt-2">
+  <header class="flex items-center justify-between gap-3 pt-2">
     <div class="font-script text-3xl leading-none">isa’s wishlist</div>${statusPill()}
   </header>
   ${demoBanner()}
   <form id="create-form" class="mt-10 sm:mt-16 bg-white rounded-xl border border-[#E3E5F0] p-5 sm:p-6 max-w-xl space-y-4">
     <div>
-      <label class="block text-sm font-semibold mb-1.5" for="c-title">List name</label>
-      <input id="c-title" class="field" maxlength="60" required placeholder="Maya’s 30th birthday">
+      <label class="block text-sm font-semibold mb-1.5" for="c-title">Nombre de la lista</label>
+      <input id="c-title" class="field" maxlength="60" required placeholder="Cumpleaños 30 de Maya">
     </div>
     <div>
-      <label class="block text-sm font-semibold mb-1.5" for="c-pass">Owner passcode</label>
-      <input id="c-pass" class="field" type="password" minlength="4" required placeholder="At least 4 characters" autocomplete="new-password">
-      <p class="text-xs text-[#6B7090] mt-1.5">You’ll need this to add, edit, or delete items. Guests never see it. It can’t be recovered.</p>
+      <label class="block text-sm font-semibold mb-1.5" for="c-pass">Código del propietario</label>
+      <input id="c-pass" class="field" type="password" minlength="4" required placeholder="Mínimo 4 caracteres" autocomplete="new-password">
+      <p class="text-xs text-[#6B7090] mt-1.5">Lo necesitarás para agregar, editar o eliminar artículos. Los invitados nunca lo ven. No se puede recuperar.</p>
     </div>
-    <button class="btn btn-iris w-full" type="submit">Create wishlist</button>
+    <button class="btn btn-iris w-full" type="submit">Crear lista de deseos</button>
   </form>
-  ${mine.length ? `<section class="mt-8 max-w-xl"><h2 class="font-display font-bold text-lg mb-2">Your lists on this device</h2>
-    <div class="space-y-2">${mine.map(l => `<a href="#/l/${esc(l.id)}" class="flex items-center justify-between bg-white border border-[#E3E5F0] rounded-lg px-4 py-3 hover:border-iris transition-colors"><span class="font-medium">${esc(l.title)}</span><span class="text-iris text-sm font-semibold">Open</span></a>`).join('')}</div></section>` : ''}`;
+  ${mine.length ? `<section class="mt-8 max-w-xl"><h2 class="font-sans font-bold text-lg mb-2">Tus listas en este dispositivo</h2>
+    <div class="space-y-2">${mine.map(l => `<a href="#/l/${esc(l.id)}" class="flex items-center justify-between bg-white border border-[#E3E5F0] rounded-lg px-4 py-3 hover:border-iris transition-colors"><span class="font-medium">${esc(l.title)}</span><span class="text-iris text-sm font-semibold">Abrir</span></a>`).join('')}</div></section>` : ''}`;
 
   $('#create-form').onsubmit = async e => {
     e.preventDefault();
     const title = $('#c-title').value.trim(), pass = $('#c-pass').value;
     if (!title || pass.length < 4) return;
-    const btn = e.submitter; btn.disabled = true; btn.textContent = 'Creating…';
+    const btn = e.submitter; btn.disabled = true; btn.textContent = 'Creando…';
     const id = shortId();
     try {
       await Backend.create(id, { title, owner: await hashPass(id, pass), createdAt: Date.now() });
@@ -274,8 +275,8 @@ function renderHome() {
       ssSet('wl-owner:' + id, '1');
       location.hash = '#/l/' + id;
     } catch (err) {
-      btn.disabled = false; btn.textContent = 'Create wishlist';
-      toast('Couldn’t create the list. Check your Firebase config and rules.');
+      btn.disabled = false; btn.textContent = 'Crear lista de deseos';
+      toast('No se pudo crear la lista. Revisa tu configuración y tus reglas de Firebase.');
       console.error(err);
     }
   };
@@ -284,15 +285,15 @@ function renderHome() {
 /* ---------- List view ---------- */
 function renderList() {
   const root = $('#app');
-  const head = `<header class="flex items-center justify-between pt-2">
+  const head = `<header class="flex items-center justify-between gap-3 pt-2">
       <a href="#/" class="font-script text-3xl leading-none">isa’s wishlist</a>${statusPill()}</header>`;
 
-  if (S.status === 'loading') { root.innerHTML = head + `<p class="mt-16 text-[#6B7090]">Loading list…</p>`; return; }
+  if (S.status === 'loading') { root.innerHTML = head + `<p class="mt-16 text-[#6B7090]">Cargando lista…</p>`; return; }
   if (S.status === 'missing') {
-    root.innerHTML = head + `<div class="mt-16 max-w-md"><h1 class="font-display font-extrabold text-3xl">We couldn’t find that list.</h1><p class="mt-2 text-[#4B4F73]">Check the link, or ask the owner to share it again.</p><a href="#/" class="btn btn-primary mt-5">Create a new list</a></div>`; return;
+    root.innerHTML = head + `<div class="mt-16 max-w-md"><h1 class="font-sans font-bold text-3xl">No encontramos esa lista.</h1><p class="mt-2 text-[#4B4F73]">Revisa el enlace o pídele al propietario que lo comparta de nuevo.</p><a href="#/" class="btn btn-primary mt-5">Crear una lista nueva</a></div>`; return;
   }
   if (S.status === 'error') {
-    root.innerHTML = head + `<div class="mt-16 max-w-md"><h1 class="font-display font-extrabold text-3xl">Can’t reach the list.</h1><p class="mt-2 text-[#4B4F73]">${esc(S.err)} If you own this list, check your Firebase rules allow reads on <code>lists</code>.</p></div>`; return;
+    root.innerHTML = head + `<div class="mt-16 max-w-md"><h1 class="font-sans font-bold text-3xl">No se puede acceder a la lista.</h1><p class="mt-2 text-[#4B4F73]">${esc(S.err)} Si eres el propietario, revisa que tus reglas de Firebase permitan leer <code>lists</code>.</p></div>`; return;
   }
 
   const items = itemsOf(S.list);
@@ -306,34 +307,34 @@ function renderList() {
   <section class="mt-8 sm:mt-12">
     <div class="flex flex-wrap items-end justify-between gap-4">
       <div class="min-w-0">
-        <h1 class="font-display font-extrabold text-3xl sm:text-5xl tracking-tight leading-[1.05] break-words">${esc(S.list.title)}</h1>
-        <p class="mt-2 text-[#4B4F73]">${items.length} ${items.length === 1 ? 'item' : 'items'}${showClaims && items.length ? `, ${claimedCount} claimed` : ''}</p>
+        <h1 class="font-sans font-bold uppercase text-3xl sm:text-5xl tracking-tight leading-[1.05] break-words">Opciones</h1>
+        <p class="mt-2 text-[#4B4F73]">${items.length} ${items.length === 1 ? 'artículo' : 'artículos'}${showClaims && items.length ? `, ${claimedCount} ${claimedCount === 1 ? 'reservado' : 'reservados'}` : ''}</p>
       </div>
       <div class="flex gap-2 flex-wrap">
-        <button class="btn btn-ghost" data-action="share">Copy share link</button>
-        <button class="btn ${S.owner ? 'btn-primary' : 'btn-ghost'}" data-action="owner" aria-pressed="${S.owner}">${S.owner ? 'Owner mode on' : 'Owner login'}</button>
+        <button class="btn btn-ghost" data-action="share">Copiar enlace para compartir</button>
+        <button class="btn ${S.owner ? 'btn-primary' : 'btn-ghost'}" data-action="owner" aria-pressed="${S.owner}">${S.owner ? 'Modo propietario activado' : 'Acceso de propietario'}</button>
       </div>
     </div>
     ${demoBanner()}
     ${S.owner ? `
     <div class="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white border border-[#E3E5F0] p-3 sm:p-4">
-      <button class="btn btn-iris" data-action="add">+ Add item</button>
+      <button class="btn btn-iris" data-action="add">+ Agregar artículo</button>
       <label class="flex items-center gap-2.5 text-sm cursor-pointer select-none">
         <input type="checkbox" class="w-5 h-5 accent-[#5B4BFF]" data-action="surprise" ${S.hideClaims ? 'checked' : ''}>
-        <span><b>Keep it a surprise</b><span class="text-[#6B7090]"> — hide who’s buying what from me</span></span>
+        <span><b>Mantenerlo como sorpresa</b><span class="text-[#6B7090]"> — ocultarme quién compra qué</span></span>
       </label>
     </div>` : ''}
-    ${cats.length > 2 ? `<div class="mt-6 flex gap-2 overflow-x-auto pb-1 -mx-4 px-4" role="tablist" aria-label="Filter by category">
-      ${cats.map(c => `<button role="tab" aria-selected="${c === S.filter}" data-action="filter" data-id="${esc(c)}" class="shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${c === S.filter ? 'bg-ink text-white' : 'bg-white border border-[#E3E5F0] hover:border-ink'}">${c === 'All' ? 'All' : CATEGORIES[c] + ' ' + c}</button>`).join('')}</div>` : ''}
+    ${cats.length > 2 ? `<div class="mt-6 flex gap-2 overflow-x-auto pb-1 -mx-4 px-4" role="tablist" aria-label="Filtrar por categoría">
+      ${cats.map(c => `<button role="tab" aria-selected="${c === S.filter}" data-action="filter" data-id="${esc(c)}" class="shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${c === S.filter ? 'bg-ink text-white' : 'bg-white border border-[#E3E5F0] hover:border-ink'}">${c === 'All' ? 'Todas' : CATEGORIES[c] + ' ' + CAT_LABELS[c]}</button>`).join('')}</div>` : ''}
   </section>
 
   <section class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
     ${shown.map(i => card(i, showClaims)).join('')}
   </section>
   ${!shown.length ? `<div class="mt-10 text-center max-w-sm mx-auto py-10">
-      <div class="text-5xl mb-3">🦂</div>
-      <h2 class="font-display font-bold text-xl">${S.owner ? 'Your list is empty' : 'Nothing here yet'}</h2>
-      <p class="text-[#4B4F73] mt-1">${S.owner ? 'Add your first item to start sharing.' : 'The owner hasn’t added anything. Check back soon.'}</p></div>` : ''}`;
+      <div class="text-5xl mb-3">🎁</div>
+      <h2 class="font-sans font-bold text-xl">${S.owner ? 'Tu lista está vacía' : 'Aún no hay nada aquí'}</h2>
+      <p class="text-[#4B4F73] mt-1">${S.owner ? 'Agrega tu primer artículo para empezar a compartir.' : 'El propietario aún no ha agregado nada. Vuelve pronto.'}</p></div>` : ''}`;
 
   S.pop.forEach(id => { const el = root.querySelector(`[data-card="${CSS.escape(id)}"]`); if (el) el.classList.add('pop'); });
   S.pop.clear();
@@ -350,24 +351,24 @@ function card(i, showClaims) {
   let action = '';
   if (S.owner) {
     action = `<div class="flex gap-2">
-      <button class="btn btn-ghost flex-1" data-action="edit" data-id="${esc(i.id)}">Edit</button>
-      <button class="btn btn-ghost text-[#C2343A]" data-action="delete" data-id="${esc(i.id)}" aria-label="Delete ${esc(i.name)}">Delete</button>
-      ${claimed ? `<button class="btn btn-ghost" data-action="force-release" data-id="${esc(i.id)}" title="Release this claim">Reset claim</button>` : ''}</div>`;
+      <button class="btn btn-ghost flex-1" data-action="edit" data-id="${esc(i.id)}">Editar</button>
+      <button class="btn btn-ghost text-[#C2343A]" data-action="delete" data-id="${esc(i.id)}" aria-label="Eliminar ${esc(i.name)}">Eliminar</button>
+      ${claimed ? `<button class="btn btn-ghost" data-action="force-release" data-id="${esc(i.id)}" title="Liberar esta reserva">Restablecer reserva</button>` : ''}</div>`;
   } else if (!claimed) {
-    action = `<button class="btn btn-iris w-full" data-action="claim" data-id="${esc(i.id)}">I’ll buy this</button>`;
+    action = `<button class="btn btn-iris w-full" data-action="claim" data-id="${esc(i.id)}">Yo lo compro</button>`;
   } else {
     action = `<div class="flex gap-2">
-      <button class="btn flex-1 bg-[#DDEFE8] text-[#3D6B5A]" disabled>Claimed</button>
-      ${mine ? `<button class="btn btn-ghost" data-action="undo" data-id="${esc(i.id)}">Undo</button>` : ''}</div>`;
+      <button class="btn flex-1 bg-[#DDEFE8] text-[#3D6B5A]" disabled>Reservado</button>
+      ${mine ? `<button class="btn btn-ghost" data-action="undo" data-id="${esc(i.id)}">Deshacer</button>` : ''}</div>`;
   }
   return `<article class="tag p-5 pt-9 flex flex-col ${claimed ? 'claimed' : ''}" data-card="${esc(i.id)}">
     <div class="flex items-start justify-between gap-3">
-      <span class="text-xs font-semibold text-[#4B4F73] bg-paper rounded-full px-2.5 py-1">${CATEGORIES[i.category] || '✨'} ${esc(i.category || 'Other')}</span>
+      <span class="text-xs font-semibold text-[#4B4F73] bg-paper rounded-full px-2.5 py-1">${CATEGORIES[i.category] || '✨'} ${esc(CAT_LABELS[i.category] || i.category || 'Otros')}</span>
       ${i.price ? `<span class="font-sans font-bold text-lg whitespace-nowrap">${esc(i.price)}</span>` : ''}
     </div>
-    ${img ? `<button type="button" data-action="zoom" data-id="${esc(i.id)}" class="block w-full mt-3 overflow-hidden rounded-md bg-paper" aria-label="View larger picture of ${esc(i.name)}"><img src="${esc(img)}" alt="${esc(i.name)}" loading="lazy" class="w-full aspect-[4/3] object-cover"></button>` : ''}
+    ${img ? `<button type="button" data-action="zoom" data-id="${esc(i.id)}" class="block w-full mt-3 overflow-hidden rounded-md bg-paper" aria-label="Ver imagen más grande de ${esc(i.name)}"><img src="${esc(img)}" alt="${esc(i.name)}" loading="lazy" class="w-full aspect-[4/3] object-cover"></button>` : ''}
     <h3 class="mt-3 font-sans font-bold uppercase tracking-wide text-[17px] leading-snug"><span class="title-text">${esc(i.name)}</span></h3>
-    ${claimed ? `<span class="badge-in self-start mt-2 inline-flex items-center gap-1 text-xs font-semibold text-mint bg-[#DDF3EA] rounded-full px-2.5 py-1">✓ Claimed${mine ? ' by you' : ''}</span>` : ''}
+    ${claimed ? `<span class="badge-in self-start mt-2 inline-flex items-center gap-1 text-xs font-semibold text-mint bg-[#DDF3EA] rounded-full px-2.5 py-1">✓ Reservado${mine ? ' por ti' : ''}</span>` : ''}
     ${i.link ? `<p class="mt-2 text-sm text-[#4B4F73] leading-relaxed whitespace-pre-line break-words">${linkify(i.link)}</p>` : ''}
     <div class="mt-auto pt-5">${action}</div>
   </article>`;
@@ -378,7 +379,7 @@ document.addEventListener('click', async e => {
   const el = e.target.closest('[data-action]'); if (!el || el.tagName === 'INPUT') return;
   const a = el.dataset.action, id = el.dataset.id;
   if (a === 'share') return share();
-  if (a === 'owner') return S.owner ? (S.owner = false, ssDel('wl-owner:' + S.listId), renderList(), toast('Owner mode off')) : passcodeModal();
+  if (a === 'owner') return S.owner ? (S.owner = false, ssDel('wl-owner:' + S.listId), renderList(), toast('Modo propietario desactivado')) : passcodeModal();
   if (a === 'add') return itemModal();
   if (a === 'edit') return itemModal(S.list.items[id] && { ...S.list.items[id], id });
   if (a === 'delete') return deleteModal(id);
@@ -388,7 +389,7 @@ document.addEventListener('click', async e => {
   if (a === 'zoom') {
     const it = S.list?.items?.[id];
     if (it && typeof it.image === 'string' && it.image.startsWith('data:image/'))
-      openModal(`<img src="${esc(it.image)}" alt="${esc(it.name)}" class="w-full rounded-md"><div class="mt-4 flex justify-end"><button class="btn btn-ghost" data-close>Close</button></div>`);
+      openModal(`<img src="${esc(it.image)}" alt="${esc(it.name)}" class="w-full rounded-md"><div class="mt-4 flex justify-end"><button class="btn btn-ghost" data-close>Cerrar</button></div>`);
     return;
   }
   if (a === 'claim') return claim(id, el);
@@ -399,8 +400,8 @@ document.addEventListener('change', e => {
 
 async function share() {
   const url = location.href.split('#')[0] + '#/l/' + S.listId;
-  try { await navigator.clipboard.writeText(url); toast('Link copied. Anyone with it can view and claim items.'); }
-  catch { window.prompt('Copy this link:', url); }
+  try { await navigator.clipboard.writeText(url); toast('Enlace copiado. Cualquiera que lo tenga puede ver y reservar artículos.'); }
+  catch { window.prompt('Copia este enlace:', url); }
 }
 
 async function claim(itemId, btn) {
@@ -412,10 +413,10 @@ async function claim(itemId, btn) {
     if (ok) {
       setMyClaim(itemId, token); S.pop.add(itemId);
       confetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
-      toast('🎉 It’s yours. Everyone else can see it’s taken.');
+      toast('🎉 Es tuyo. Todos los demás verán que ya está reservado.');
       if (Backend.mode === 'local') renderList(); // local backend is synchronous-ish; subscribe handles Firebase
-    } else { toast('Someone just claimed that one.'); }
-  } catch (err) { console.error(err); toast('Couldn’t claim. Please try again.'); btn.disabled = false; }
+    } else { toast('Alguien acaba de reservar ese.'); }
+  } catch (err) { console.error(err); toast('No se pudo reservar. Inténtalo de nuevo.'); btn.disabled = false; }
 }
 
 /* ---------- Modals ---------- */
@@ -435,37 +436,37 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal()
 
 function undoModal(itemId, force = false) {
   const it = S.list?.items?.[itemId]; if (!it) return;
-  openModal(`<h2 class="font-display font-extrabold text-2xl">${force ? 'Reset this claim?' : 'Release this item?'}</h2>
-    <p class="mt-2 text-[#4B4F73]">“${esc(it.name)}” will become available to everyone again. ${force ? 'The person who claimed it won’t be notified.' : 'Only do this if you clicked by accident or can’t buy it anymore.'}</p>
+  openModal(`<h2 class="font-sans font-bold text-2xl">${force ? '¿Restablecer esta reserva?' : '¿Liberar este artículo?'}</h2>
+    <p class="mt-2 text-[#4B4F73]">“${esc(it.name)}” volverá a estar disponible para todos. ${force ? 'La persona que lo reservó no recibirá ningún aviso.' : 'Hazlo solo si te equivocaste de clic o ya no puedes comprarlo.'}</p>
     <div class="mt-6 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
-      <button class="btn btn-ghost" data-close>Keep my claim</button>
-      <button class="btn btn-danger" id="confirm-undo">${force ? 'Reset claim' : 'Yes, release it'}</button></div>`,
+      <button class="btn btn-ghost" data-close>Mantener mi reserva</button>
+      <button class="btn btn-danger" id="confirm-undo">${force ? 'Restablecer reserva' : 'Sí, liberarlo'}</button></div>`,
     root => {
-      if (force) root.querySelector('[data-close].btn').textContent = 'Cancel';
+      if (force) root.querySelector('[data-close].btn').textContent = 'Cancelar';
       $('#confirm-undo').onclick = async () => {
         try {
           const ok = await Backend.release(S.listId, itemId, myClaims()[itemId], force);
-          if (ok) { setMyClaim(itemId, null); toast('Released. It’s available again.'); } else toast('That claim has already changed.');
-        } catch { toast('Couldn’t release. Please try again.'); }
+          if (ok) { setMyClaim(itemId, null); toast('Liberado. Vuelve a estar disponible.'); } else toast('Esa reserva ya cambió.');
+        } catch { toast('No se pudo liberar. Inténtalo de nuevo.'); }
         closeModal();
       };
     });
 }
 
 function passcodeModal() {
-  openModal(`<h2 class="font-display font-extrabold text-2xl">Owner login</h2>
-    <p class="mt-1 text-[#4B4F73] text-sm">Enter the passcode you chose when you created this list.</p>
+  openModal(`<h2 class="font-sans font-bold text-2xl">Acceso de propietario</h2>
+    <p class="mt-1 text-[#4B4F73] text-sm">Ingresa el código que elegiste al crear esta lista.</p>
     <form id="pass-form" class="mt-4 space-y-3">
-      <input class="field" type="password" id="pass-in" placeholder="Passcode" autocomplete="current-password" required>
-      <p id="pass-err" class="text-sm text-[#C2343A] hidden">That passcode doesn’t match. Try again.</p>
+      <input class="field" type="password" id="pass-in" placeholder="Código" autocomplete="current-password" required>
+      <p id="pass-err" class="text-sm text-[#C2343A] hidden">Ese código no coincide. Inténtalo de nuevo.</p>
       <div class="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
-        <button type="button" class="btn btn-ghost" data-close>Cancel</button>
-        <button class="btn btn-primary" type="submit">Unlock</button></div></form>`,
+        <button type="button" class="btn btn-ghost" data-close>Cancelar</button>
+        <button class="btn btn-primary" type="submit">Desbloquear</button></div></form>`,
     () => {
       $('#pass-form').onsubmit = async e => {
         e.preventDefault();
         const h = await hashPass(S.listId, $('#pass-in').value);
-        if (h === S.list?.owner) { S.owner = true; ssSet('wl-owner:' + S.listId, '1'); closeModal(); renderList(); toast('Owner mode on'); }
+        if (h === S.list?.owner) { S.owner = true; ssSet('wl-owner:' + S.listId, '1'); closeModal(); renderList(); toast('Modo propietario activado'); }
         else { $('#pass-err').classList.remove('hidden'); $('#pass-in').select(); }
       };
     });
@@ -473,24 +474,24 @@ function passcodeModal() {
 
 function itemModal(item) {
   const editing = !!item;
-  openModal(`<h2 class="font-display font-extrabold text-2xl">${editing ? 'Edit item' : 'Add an item'}</h2>
+  openModal(`<h2 class="font-sans font-bold text-2xl">${editing ? 'Editar artículo' : 'Agregar un artículo'}</h2>
     <form id="item-form" class="mt-4 space-y-3">
-      <div><label class="block text-sm font-semibold mb-1" for="i-name">Item name</label>
-        <input id="i-name" class="field" required maxlength="80" placeholder="Noise-cancelling headphones" value="${esc(item?.name)}"></div>
+      <div><label class="block text-sm font-semibold mb-1" for="i-name">Nombre del artículo</label>
+        <input id="i-name" class="field" required maxlength="80" placeholder="Audífonos con cancelación de ruido" value="${esc(item?.name)}"></div>
       <div class="grid grid-cols-2 gap-3">
-        <div><label class="block text-sm font-semibold mb-1" for="i-price">Price or estimate</label>
+        <div><label class="block text-sm font-semibold mb-1" for="i-price">Precio o estimado</label>
           <input id="i-price" class="field" maxlength="20" placeholder="$120" value="${esc(item?.price)}"></div>
-        <div><label class="block text-sm font-semibold mb-1" for="i-cat">Category</label>
-          <select id="i-cat" class="field">${Object.keys(CATEGORIES).map(c => `<option ${((item?.category || 'Other') === c) ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+        <div><label class="block text-sm font-semibold mb-1" for="i-cat">Categoría</label>
+          <select id="i-cat" class="field">${Object.keys(CATEGORIES).map(c => `<option value="${c}" ${((item?.category || 'Other') === c) ? 'selected' : ''}>${CAT_LABELS[c]}</option>`).join('')}</select></div>
       </div>
-      <div><label class="block text-sm font-semibold mb-1" for="i-link">Link or notes</label>
-        <textarea id="i-link" class="field" rows="3" maxlength="500" placeholder="https://… or “size M, black”">${esc(item?.link)}</textarea></div>
-      <div><span class="block text-sm font-semibold mb-1">Picture <span class="font-normal text-[#6B7090]">(optional)</span></span>
+      <div><label class="block text-sm font-semibold mb-1" for="i-link">Enlace o notas</label>
+        <textarea id="i-link" class="field" rows="3" maxlength="500" placeholder="https://… o “talla M, negro”">${esc(item?.link)}</textarea></div>
+      <div><span class="block text-sm font-semibold mb-1">Imagen <span class="font-normal text-[#6B7090]">(opcional)</span></span>
         <div id="img-drop" class="border-2 border-dashed border-[#CBD0E4] rounded-lg p-4 text-center transition-colors"><div id="img-box"></div></div>
         <input type="file" id="i-file" accept="image/*" class="hidden"></div>
       <div class="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-2">
-        <button type="button" class="btn btn-ghost" data-close>Cancel</button>
-        <button class="btn btn-iris" type="submit">${editing ? 'Save changes' : 'Add to list'}</button></div></form>`,
+        <button type="button" class="btn btn-ghost" data-close>Cancelar</button>
+        <button class="btn btn-iris" type="submit">${editing ? 'Guardar cambios' : 'Agregar a la lista'}</button></div></form>`,
     () => {
       let image = (typeof item?.image === 'string' && item.image.startsWith('data:image/')) ? item.image : '';
       let pending = Promise.resolve();
@@ -498,21 +499,21 @@ function itemModal(item) {
       const draw = msg => {
         if (msg) { box.innerHTML = `<p class="text-sm text-[#4B4F73] py-6">${esc(msg)}</p>`; return; }
         if (image) {
-          box.innerHTML = `<img src="${esc(image)}" alt="Preview of the picture" class="w-full max-h-52 object-contain rounded-md bg-paper">
+          box.innerHTML = `<img src="${esc(image)}" alt="Vista previa de la imagen" class="w-full max-h-52 object-contain rounded-md bg-paper">
             <div class="mt-3 flex gap-2 justify-center">
-              <button type="button" class="btn btn-ghost" id="img-replace">Replace</button>
-              <button type="button" class="btn btn-ghost text-[#C2343A]" id="img-remove">Remove</button></div>`;
+              <button type="button" class="btn btn-ghost" id="img-replace">Reemplazar</button>
+              <button type="button" class="btn btn-ghost text-[#C2343A]" id="img-remove">Quitar</button></div>`;
           $('#img-replace').onclick = () => fileIn.click();
           $('#img-remove').onclick = () => { image = ''; draw(); };
         } else {
-          box.innerHTML = `<p class="text-sm text-[#4B4F73]"><b>Paste an image</b> (Ctrl/Cmd + V), drop one here, or</p>
-            <button type="button" class="btn btn-ghost mt-3" id="img-choose">Choose a file</button>`;
+          box.innerHTML = `<p class="text-sm text-[#4B4F73]"><b>Pega una imagen</b> (Ctrl/Cmd + V), suelta una aquí o</p>
+            <button type="button" class="btn btn-ghost mt-3" id="img-choose">Elegir un archivo</button>`;
           $('#img-choose').onclick = () => fileIn.click();
         }
       };
       const load = file => {
-        draw('Processing image…');
-        pending = fileToDataUrl(file).then(u => { image = u; draw(); }).catch(() => { draw(); toast('That file isn’t an image we can use.'); });
+        draw('Procesando imagen…');
+        pending = fileToDataUrl(file).then(u => { image = u; draw(); }).catch(() => { draw(); toast('Ese archivo no es una imagen válida.'); });
       };
       fileIn.onchange = () => { if (fileIn.files[0]) load(fileIn.files[0]); fileIn.value = ''; };
       const onPaste = e => {
@@ -533,20 +534,20 @@ function itemModal(item) {
         const data = { id: item?.id || uid(), name: $('#i-name').value.trim(), price: $('#i-price').value.trim(), link: $('#i-link').value.trim(), category: $('#i-cat').value, image: image || null };
         if (!data.name) { btn.disabled = false; return; }
         if (!editing) data.createdAt = Date.now();
-        try { await Backend.saveItem(S.listId, data); closeModal(); toast(editing ? 'Saved' : 'Added to your list'); }
-        catch (err) { console.error(err); btn.disabled = false; toast('Couldn’t save. Please try again.'); }
+        try { await Backend.saveItem(S.listId, data); closeModal(); toast(editing ? 'Guardado' : 'Agregado a tu lista'); }
+        catch (err) { console.error(err); btn.disabled = false; toast('No se pudo guardar. Inténtalo de nuevo.'); }
       };
     });
 }
 
 function deleteModal(itemId) {
   const it = S.list?.items?.[itemId]; if (!it) return;
-  openModal(`<h2 class="font-display font-extrabold text-2xl">Delete this item?</h2>
-    <p class="mt-2 text-[#4B4F73]">“${esc(it.name)}” will be removed for everyone${it.claim ? ', including the person who claimed it' : ''}.</p>
+  openModal(`<h2 class="font-sans font-bold text-2xl">¿Eliminar este artículo?</h2>
+    <p class="mt-2 text-[#4B4F73]">“${esc(it.name)}” se eliminará para todos${it.claim ? ', incluida la persona que lo reservó' : ''}.</p>
     <div class="mt-6 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
-      <button class="btn btn-ghost" data-close>Cancel</button>
-      <button class="btn btn-danger" id="confirm-del">Delete item</button></div>`,
-    () => { $('#confirm-del').onclick = async () => { try { await Backend.deleteItem(S.listId, itemId); toast('Deleted'); } catch { toast('Couldn’t delete. Please try again.'); } closeModal(); }; });
+      <button class="btn btn-ghost" data-close>Cancelar</button>
+      <button class="btn btn-danger" id="confirm-del">Eliminar artículo</button></div>`,
+    () => { $('#confirm-del').onclick = async () => { try { await Backend.deleteItem(S.listId, itemId); toast('Eliminado'); } catch { toast('No se pudo eliminar. Inténtalo de nuevo.'); } closeModal(); }; });
 }
 
 /* ---------- Image helper: resize + compress so it stays small in the database ---------- */
